@@ -1,19 +1,63 @@
 import React, { useState, useRef } from "react";
 import { apiClient } from "@/lib/apiClient"; // Adjust the import based on your project structure
+import { handleStream } from '@/lib/utils/handleStream';
+import { MessageResponse } from "@/lib/apiClient/schemas/message";
+import { v4 as uuidv4 } from 'uuid';
 
 const ChatScreen = () => {
-  const [messages, setMessages] = useState<string[]>([]);
+  const [messages, setMessages] = useState<MessageResponse[]>([]);
   const inputChatRef = useRef<HTMLInputElement>(null);
+  const [isStreaming, setIsStreaming] = useState(false);
 
   const handleSend = async () => {
     if (!inputChatRef.current) return;
-    const message = inputChatRef.current.value;
-    if (message.trim()) {
-      //   const stream = await apiClient.postMessageStream(message);
-      //   console.log("stream", stream);
+    const message = inputChatRef.current.value.trim();
+
+    if (!message || isStreaming) return;
+
+    try {
+      setIsStreaming(true);
+      const userMessage: MessageResponse = { id: uuidv4(), content: message };
+      setMessages(prev => [...prev, userMessage]);
+
+      const response = await apiClient.postMessageAPI({ message });
       inputChatRef.current.value = "";
+
+      // Initialize assistant's response
+      // setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+
+      handleStream(response, {
+        onMessage: (data) => {
+          setMessages(prev => {
+            const _messages = [...prev];
+            const lastMessage = _messages[_messages.length - 1];
+            if (lastMessage.id === data.id) {
+              lastMessage.content += data.content;
+            }
+            else {
+              _messages.push(data)
+            }
+            return _messages;
+          });
+        },
+        onError: (error) => {
+          console.error('Stream error:', error);
+          // Handle error in UI
+        },
+        onClose: () => {
+          setIsStreaming(false);
+          // Handle stream completion
+        },
+        onOpen: () => {
+          console.log('Stream started');
+        }
+      });
+    } catch (error) {
+      console.error('Failed to send message:', error);
+      setIsStreaming(false);
     }
   };
+
   const handleKeyDown = (event: React.KeyboardEvent) => {
     if (event.key === "Enter") {
       handleSend();
@@ -41,11 +85,12 @@ const ChatScreen = () => {
             style={{
               margin: "5px 0",
               padding: "10px",
-              backgroundColor: "#fff",
+              backgroundColor: "rgb(192 72 72)",
               borderRadius: "5px",
+              color: "#fff"
             }}
           >
-            {msg}
+            {msg.content || (msg.role === 'assistant' && isStreaming ? '...' : '')}
           </div>
         ))}
       </div>
@@ -66,6 +111,7 @@ const ChatScreen = () => {
           }}
           placeholder="Type a message..."
           onKeyDown={handleKeyDown}
+          disabled={isStreaming}
         />
         <button
           onClick={handleSend}
@@ -78,6 +124,7 @@ const ChatScreen = () => {
             borderRadius: "5px",
             cursor: "pointer",
           }}
+          disabled={isStreaming}
         >
           Send
         </button>
