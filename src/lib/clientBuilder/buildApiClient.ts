@@ -1,9 +1,10 @@
-import { infer as ZodInfer, ZodMapDef, ZodSchema } from "zod";
+import { z, infer as ZodInfer, ZodMapDef, ZodSchema } from "zod";
 import {
   ApiClientHTTPErr,
   ApiClientNetworkErr,
   APIClientSchemaValidationErr,
 } from "./error";
+import { env } from "@/config/env";
 
 export type Path = `/${string}`;
 type EndpointDefinitionBase<TPath extends Path> = {
@@ -28,8 +29,11 @@ export type PostEndpointDefination<TPath extends Path> =
     readonly request: {
       body: ZodSchema;
     };
-    readonly response: {
+    readonly response: | {
       readonly contentType: "application/json";
+      readonly body: ZodSchema;
+    } | {
+      readonly contentType: "text/event-stream";
       readonly body: ZodSchema;
     };
   };
@@ -92,7 +96,7 @@ function createEndpointFn<TDef extends EndpointDefinition<Path>>(
   getConfig: () => ApiClientConfig
 ) {
   return async (...arg: InferArguments<TDef>) => {
-    const url = (getConfig()?.baseUrl ?? "http://localhost") + def.path;
+    const url = (getConfig()?.baseUrl ?? "") + def.path;
     let body;
     let options: RequestOption | undefined = undefined;
     if (def.method !== "GET") {
@@ -115,7 +119,7 @@ function createEndpointFn<TDef extends EndpointDefinition<Path>>(
         "Content-Type": "application/json",
       },
     }).catch((reason) => {
-      console.error("Fail to fetchhhhh", reason);
+      console.log("reason", reason);
       return Promise.reject(new ApiClientNetworkErr("Fail to fetch", { url }));
     });
 
@@ -141,7 +145,27 @@ function createEndpointFn<TDef extends EndpointDefinition<Path>>(
 
       // Validate response body by ZodSchema
       return def.response.body.parse(unparsed);
-    } else {
+    }
+    else if (def.response.contentType === "text/event-stream") {
+      if (!res.headers.get("Content-Type")?.includes("text/event-stream")) {
+        throw new APIClientSchemaValidationErr(
+          `Response Content-Type header is not "text/event-stream"!`,
+          {
+            url,
+          }
+        );
+      }
+      if (!res.body) {
+        throw new APIClientSchemaValidationErr(
+          "Stream response has no body!",
+          {
+            url,
+          }
+        );
+      }
+      return res; // Return the raw response for SSE handling
+    }
+    else {
       // TODO: handle other Content-Type "text/evet-stream"
       throw new APIClientSchemaValidationErr(
         `API not support other Content-Type header`,
@@ -156,7 +180,9 @@ function createEndpointFn<TDef extends EndpointDefinition<Path>>(
 export function buildApiClient<TDefs extends EndpointDefinition<Path>[]>(
   ...defs: TDefs
 ): InferAPI<TDefs> & Configurable {
-  let currentConfig: ApiClientConfig = {};
+  let currentConfig: ApiClientConfig = {
+    baseUrl: env.API_BASE_URL,
+  };
   const getConfig = () => currentConfig;
   const clientApi: any = defs.reduce(
     (acc, def) => {
@@ -166,7 +192,10 @@ export function buildApiClient<TDefs extends EndpointDefinition<Path>[]>(
       };
     },
     {
-      setConfig: (config: ApiClientConfig) => (currentConfig = config),
+      setConfig: (config: ApiClientConfig) => (currentConfig = {
+        ...currentConfig,
+        ...config,
+      }),
     }
   );
   return clientApi;
