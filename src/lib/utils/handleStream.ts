@@ -4,19 +4,15 @@ import { readStream } from './streamUtil/readStream';
 type StreamCallback = (data: any) => void;
 
 interface StreamHandlerOptions {
-    onMessage?: StreamCallback; // Callback for handling incoming messages
+    onMessage: StreamCallback; // Callback for handling incoming messages
     onError?: (error: Error) => void; // Callback for handling errors
     onClose?: () => void; // Callback for handling stream closure
     onOpen?: () => void; // Callback for handling stream opening
 }
 
-export async function handleStream({
-    stream,
-    options
-}: {
-    stream: ReadableStream<string>
+export async function handleStream(
+    stream: ReadableStream<string>,
     options: StreamHandlerOptions
-}
 ) {
     const {
         onMessage, // Function to handle each message
@@ -26,7 +22,7 @@ export async function handleStream({
     } = options;
     return await readStream<string>(stream, (value) => {
         try {
-            console.log('value', value)
+            onMessage(value)
         } catch (error) {
             onError(error as Error);
         }

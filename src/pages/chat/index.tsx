@@ -26,41 +26,33 @@ const ChatScreen = () => {
       // Initialize assistant's response
       // setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
 
-      // handleStream(response, {
-      //   onMessage: (data) => {
-      //     setMessages(prev => {
-      //       const _messages = [...prev];
-      //       const lastMessage = _messages[_messages.length - 1];
-      //       if (lastMessage.id === data.id) {
-      //         lastMessage.content += data.content;
-      //       }
-      //       else {
-      //         _messages.push(data)
-      //       }
-      //       return _messages;
-      //     });
-      //   },
-      //   onError: (error) => {
-      //     console.error('Stream error:', error);
-      //     // Handle error in UI
-      //   },
-      //   onClose: () => {
-      //     setIsStreaming(false);
-      //     // Handle stream completion
-      //   },
-      //   onOpen: () => {
-      //     console.log('Stream started');
-      //   }
-      // });
-
-      handleStream({
-        stream: response,
-        options: {
-          onMessage: (data) => {
-            console.log('data :>> ', data);
-          }
+      handleStream(response, {
+        onMessage: (data) => {
+          setMessages(prev => {
+            const _messages = [...prev];
+            const lastMessage = _messages[_messages.length - 1];
+            if (lastMessage.id === data.id) {
+              lastMessage.content += data.content;
+            }
+            else {
+              _messages.push(data)
+            }
+            return _messages;
+          });
+        },
+        onError: (error) => {
+          console.error('Stream error:', error);
+          // Handle error in UI
+        },
+        onClose: () => {
+          setIsStreaming(false);
+          // Handle stream completion
+        },
+        onOpen: () => {
+          console.log('Stream started');
         }
-      })
+      });
+
     } catch (error) {
       console.error('Failed to send message:', error);
       setIsStreaming(false);
