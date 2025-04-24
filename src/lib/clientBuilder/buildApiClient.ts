@@ -5,6 +5,8 @@ import {
   APIClientSchemaValidationErr,
 } from "./error";
 import { env } from "@/config/env";
+import { ParseEventStream } from "../utils/streamUtil/ParseEventStream";
+import { ExtractDataaJSONStream } from "../utils/streamUtil/ExtractDataaJSONStream";
 
 export type Path = `/${string}`;
 type EndpointDefinitionBase<TPath extends Path> = {
@@ -163,7 +165,9 @@ function createEndpointFn<TDef extends EndpointDefinition<Path>>(
           }
         );
       }
-      return res; // Return the raw response for SSE handling
+      return res.body
+        .pipeThrough(new ParseEventStream()) // Return the raw response for SSE handling
+        .pipeThrough(new ExtractDataaJSONStream())
     }
     else {
       // TODO: handle other Content-Type "text/evet-stream"
