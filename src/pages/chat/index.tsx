@@ -1,8 +1,10 @@
 import React, { useState, useRef } from "react";
 import { apiClient } from "@/lib/apiClient"; // Adjust the import based on your project structure
 import { handleStream } from '@/lib/utils/handleStream';
-import { MessageResponse } from "@/lib/apiClient/schemas/message";
+import { MessageResponse, MessageRole } from "@/lib/apiClient/schemas/message";
 import { v4 as uuidv4 } from 'uuid';
+import LoadingContaner from "./_components/LoadingContainer";
+import ChatBubble from "@/components/ChatBubble";
 
 const ChatScreen = () => {
   const [messages, setMessages] = useState<MessageResponse[]>([]);
@@ -17,7 +19,7 @@ const ChatScreen = () => {
 
     try {
       setIsStreaming(true);
-      const userMessage: MessageResponse = { id: uuidv4(), content: message };
+      const userMessage: MessageResponse = { id: uuidv4(), role: MessageRole.Values.user, content: message };
       setMessages(prev => [...prev, userMessage]);
 
       const response = await apiClient.postMessageAPI({ message });
@@ -81,19 +83,9 @@ const ChatScreen = () => {
         }}
       >
         {messages.map((msg, index) => (
-          <div
-            key={index}
-            style={{
-              margin: "5px 0",
-              padding: "10px",
-              backgroundColor: "rgb(192 72 72)",
-              borderRadius: "5px",
-              color: "#fff"
-            }}
-          >
-            {msg.content || (msg.role === 'assistant' && isStreaming ? '...' : '')}
-          </div>
+          <ChatBubble key={msg.id} message={msg} />
         ))}
+        <LoadingContaner />
       </div>
       <footer
         style={{ display: "flex", padding: "10px", backgroundColor: "#fff" }}
